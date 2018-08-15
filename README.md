@@ -63,4 +63,21 @@ The S3 bucket name where CloudFront logs will be stored.
 The prefix of the log files.
 
  *Default: cloudfront*
+
 ## Resources
+
+## How To Install
+### Via AWS Management Console
+1. Open your AWS Management Console and Login to your account
+2. Switch to the region where you want to deploy the infrastructure
+3. Click on *Services*
+4. Click on *CloudFormation*
+5. Click on *Create Stack* button
+6. Under *Choose a template* choose the option *Upload a template to Amazon S3*
+7. Click on the *Browse...* button
+8. Select the CloudFormation script (BasicStaticDistribution.yml)
+9. Click on *Next* button
+10. Insert the parameters and click on *Next*
+11. Optionally you can add tags and configure CloudWatch alarms
+12. Click on *Next* button
+13. Review the information and click on *Create* button
