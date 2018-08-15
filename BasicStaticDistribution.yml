@@ -1,0 +1,178 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: 'Hendric Jabs | Static Website Hosting'
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+    - Label:
+        default: 'Section 1: Website Configuration'
+      Parameters:
+      - DomainName
+      - IndexDocument
+      - ErrorDocument
+      - Custom404ErrorPage
+    - Label:
+        default: 'Section 2: Distribution Configuration'
+      Parameters:
+      - PriceClass
+      - UseDefaultTLSCertificate
+      - CertificateArn
+      - Custom404ErrorPage#
+      - HostedZoneId
+    - Label:
+        default: 'Section 3: Logging Configuration'
+      Parameters:
+      - LoggingBucket
+      - LoggingPrefix
+        
+Parameters:
+  DomainName: 
+    Description: Domain name used for bucket name and Route53 Entry.
+    Type: String
+    ConstraintDescription: must specify domain name.
+  IndexDocument: 
+    Description: Index Document which is called if no other path is specified.
+    Type: String
+    Default: index.html
+  ErrorDocument: 
+    Description: Document which is shown in case of an error.
+    Type: String
+    Default: error.html
+  Custom404ErrorPage:
+    Description: Document which is shown in case of a 404 error.
+    Type: String
+    Default: 404.html
+  PriceClass:
+    Description: Worldwide (PriceClass_All); World without South America and Australia (PriceClass_200); US, EU, Canada (PriceClass_100) 
+    Type: String
+    AllowedValues: 
+      - PriceClass_All
+      - PriceClass_200
+      - PriceClass_100
+    Default: PriceClass_100
+  UseDefaultTLSCertificate:
+    Description: Use the default certificate for HTTPS connections? For Production use DO NOT use the default certificate.
+    Type: String
+    AllowedValues:
+      - "true"
+      - "false"
+    Default: "false"
+  CertificateArn:
+    Description: If you don't want to use a default certificate, specify the ARN of a ACM certificate in US-East-1.
+    Type: String
+  HostedZoneId:
+    Description: The hosted zone 
+    Type: AWS::Route53::HostedZone::Id
+  LoggingBucket:
+    Description: The Bucket where to store the CloudFront Logs.
+    Type: String
+  LoggingPrefix:
+    Description: The Prefix for log files.
+    Default: cloudfront
+    Type: String
+
+Conditions:
+  UseDefaultCertificate: !Equals [ !Ref UseDefaultTLSCertificate, true ]
+
+Resources:
+  OriginS3Bucket:
+    Type: AWS::S3::Bucket
+    Properties: 
+      BucketName: !Ref DomainName
+      VersioningConfiguration:
+        Status: Enabled
+      WebsiteConfiguration:
+        ErrorDocument: !Ref ErrorDocument
+        IndexDocument: !Ref IndexDocument
+  OriginS3BucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties: 
+      Bucket: !Ref OriginS3Bucket
+      PolicyDocument:
+        Statement:
+          - Action: 
+              - "s3:GetObject"
+            Effect: "Allow"
+            Resource: 
+              Fn::Join: 
+                - ""
+                - - "arn:aws:s3:::"
+                  - Ref: OriginS3Bucket
+                  - "/*"
+            Principal: 
+              CanonicalUser: !GetAtt CloudFrontOriginAccessIdentity.S3CanonicalUserId
+  CloudFrontDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig: 
+        Aliases:
+          - !Ref DomainName
+        DefaultCacheBehavior:
+          AllowedMethods:
+            - GET
+            - HEAD
+            - OPTIONS
+          CachedMethods:
+            - GET
+            - HEAD
+          Compress: false
+          DefaultTTL: 86400
+          TargetOriginId: !Ref DomainName
+          ViewerProtocolPolicy: https-only
+          ForwardedValues:
+            QueryString: false
+        Comment:
+          !Join
+            - ' '
+            - - "CloudFront Distribution for"
+              - !Ref OriginS3Bucket
+        # CustomErrorResponses:
+        #   - ErrorCachingMinTTL: 300
+        #     ErrorCode: 404
+        #     ResponseCode: 404
+        #     ResponsePagePath: !Ref Custom404ErrorPage
+        Enabled: true
+        IPV6Enabled: true
+        Logging:
+          Bucket: 
+            !Join
+            - '.'
+            - -  !Ref LoggingBucket
+              -  's3.amazonaws.com'
+          Prefix: !Ref LoggingPrefix
+
+        Origins:
+          - DomainName: !GetAtt OriginS3Bucket.DomainName
+            Id: !Ref DomainName
+            S3OriginConfig:
+              OriginAccessIdentity: 
+                !Join
+                  - '/'
+                  - -  'origin-access-identity/cloudfront'
+                    -  !Ref CloudFrontOriginAccessIdentity
+        PriceClass: !Ref PriceClass
+        ViewerCertificate:
+          Fn::If:
+            - UseDefaultCertificate
+            - CloudFrontDefaultCertificate: true
+            - AcmCertificateArn: !Ref CertificateArn
+              SslSupportMethod: sni-only
+  CloudFrontOriginAccessIdentity:
+    Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
+    Properties:
+      CloudFrontOriginAccessIdentityConfig:
+        Comment: 
+          !Join
+            - ' '
+            - - "Access Identity for"
+              - !Ref OriginS3Bucket
+  Route53DNSRecordSet:
+    Type: "AWS::Route53::RecordSet"
+    Properties: 
+      AliasTarget: 
+        DNSName: !GetAtt CloudFrontDistribution.DomainName
+        # Fixed Hosted Zone for CloudFront
+        HostedZoneId: Z2FDTNDATAQYW2
+      Comment: "Alias Record to CloudFront Distribution."
+      HostedZoneId: !Ref HostedZoneId
+      Name: !Ref DomainName
+      Type: A
