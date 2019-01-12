@@ -103,7 +103,8 @@ Resources:
   CloudFrontDistribution:
     Type: AWS::CloudFront::Distribution
     Properties:
-      DistributionConfig: 
+      DistributionConfig:
+        DefaultRootObject: !Ref IndexDocument 
         Aliases:
           - !Ref DomainName
         DefaultCacheBehavior:
