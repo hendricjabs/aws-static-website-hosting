@@ -91,12 +91,7 @@ Resources:
           - Action: 
               - "s3:GetObject"
             Effect: "Allow"
-            Resource: 
-              Fn::Join: 
-                - ""
-                - - "arn:aws:s3:::"
-                  - Ref: OriginS3Bucket
-                  - "/*"
+            Resource: !Sub "arn:aws:s3:::${OriginS3Bucket}/*"
             Principal: 
               CanonicalUser: !GetAtt CloudFrontOriginAccessIdentity.S3CanonicalUserId
   CloudFrontDistribution:
@@ -120,35 +115,22 @@ Resources:
           ViewerProtocolPolicy: https-only
           ForwardedValues:
             QueryString: false
-        Comment:
-          !Join
-            - ' '
-            - - "CloudFront Distribution for"
-              - !Ref OriginS3Bucket
-        # CustomErrorResponses:
-        #   - ErrorCachingMinTTL: 300
-        #     ErrorCode: 404
-        #     ResponseCode: 404
-        #     ResponsePagePath: !Ref Custom404ErrorPage
+        Comment: !Sub "CloudFront Distribution for ${OriginS3Bucket}"
+        CustomErrorResponses:
+          - ErrorCachingMinTTL: 300
+            ErrorCode: 404
+            ResponseCode: 404
+            ResponsePagePath: !Ref Custom404ErrorPage
         Enabled: true
         IPV6Enabled: true
         Logging:
-          Bucket: 
-            !Join
-            - '.'
-            - -  !Ref LoggingBucket
-              -  's3.amazonaws.com'
+          Bucket: !Sub "${LoggingBucket}.s3.amazonaws.com"
           Prefix: !Ref LoggingPrefix
-
         Origins:
           - DomainName: !GetAtt OriginS3Bucket.DomainName
             Id: !Ref DomainName
             S3OriginConfig:
-              OriginAccessIdentity: 
-                !Join
-                  - '/'
-                  - -  'origin-access-identity/cloudfront'
-                    -  !Ref CloudFrontOriginAccessIdentity
+              OriginAccessIdentity: !Sub "origin-access-identity/cloudfront/${CloudFrontOriginAccessIdentity}"
         PriceClass: !Ref PriceClass
         ViewerCertificate:
           Fn::If:
@@ -160,11 +142,7 @@ Resources:
     Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
     Properties:
       CloudFrontOriginAccessIdentityConfig:
-        Comment: 
-          !Join
-            - ' '
-            - - "Access Identity for"
-              - !Ref OriginS3Bucket
+        Comment: !Sub "Access Identity for ${OriginS3Bucket}"
   Route53DNSRecordSet:
     Type: "AWS::Route53::RecordSet"
     Properties: 
