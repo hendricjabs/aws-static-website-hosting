@@ -16,7 +16,6 @@ Metadata:
       - PriceClass
       - UseDefaultTLSCertificate
       - CertificateArn
-      - Custom404ErrorPage#
       - HostedZoneId
     - Label:
         default: 'Section 3: Logging Configuration'
